@@ -1,0 +1,71 @@
+#IMPORT LIBRARY
+import numpy as np 
+import pandas as pd 
+import matplotlib.pyplot as plt 
+from statsmodels.tsa.seasonal import seasonal_decompose 
+
+#LOAD DATA
+import os
+os.chdir('C:\\Users\\NEW\\Desktop\\python\\class 9 - forcasting')
+ash = pd.read_csv('data.csv')
+ash
+ash.plot()
+
+#DATA WRANGLING(pre-process)
+ash = ash.drop("month",axis = 1) #remove date&time
+ash
+
+#scaling the data using log function
+ash['cases'] = np.log10(ash["cases"]) #only dependent values
+ash
+result = seasonal_decompose(ash['cases'],  model ='multiplicative') 
+result.plot()
+
+#import library
+from pmdarima import auto_arima 
+import warnings 
+warnings.filterwarnings("ignore") 
+
+#FORCASTING MODEL
+stepwise_fit = auto_arima(ash['cases'],trace = True, start_p = 0, start_q = 0, 
+max_p = 20, max_q = 20, m = 12, start_P = 0,start_Q = 0, max_P = 20,max_Q = 20,  seasonal = True, 
+ d = 1, D = 1, error_action ='ignore',   
+ suppress_warnings = True,   stepwise = True)
+stepwise_fit.summary()
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+model = SARIMAX(ash['cases'],  
+                        order = (0, 1, 1))
+result = model.fit()
+
+#hint : value of q,p,d might changes based on data size
+
+#prediction
+forecast = result.predict(start = len(ash),  
+                          end = (len(ash)-1) + 30,  
+                          typ = 'levels').rename('Forecast')
+
+#FUTURE TREND
+forecast = np.power(10,forecast)#reverse of log10
+ash['cases'].plot(figsize = (12, 5), legend = True) 
+forecast.plot(legend = True)
+
+
+###########mape test
+#TRAIN-TEST DATA SPLIT
+train = ash.iloc[:21] 
+len(train)
+test = ash.iloc[21:] 
+len(test)
+model = SARIMAX(ash['cases'],  
+                order = (0, 1, 0),seasonal_order=(0,1,1,12))
+  
+result = model.fit() 
+result.summary()
+predictions = result.predict(21, 29, 
+typ = 'levels').rename("Predictions") 
+len(predictions)
+def mean_absolute_percentage_error(y_true, y_pred): 
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+mean_absolute_percentage_error(test['cases'],predictions)
